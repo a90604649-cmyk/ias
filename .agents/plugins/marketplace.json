@@ -1,0 +1,20 @@
+{
+  "name": "codex-gemini-team-marketplace",
+  "interface": {
+    "displayName": "Codex Gemini Team"
+  },
+  "plugins": [
+    {
+      "name": "codex-gemini-team",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
