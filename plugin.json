@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "codex-gemini-team",
+  "version": "0.1.0",
+  "description": "Lets Codex and Google Antigravity negotiate coding tasks, delegate implementation, and review each other's work.",
+  "author": {
+    "name": "a90604649-cmyk"
+  },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Codex + Gemini Team",
+        "shortDescription": "Pair Codex with Gemini",
+        "longDescription": "Coordinate Codex and Gemini as peers: compare strengths, agree on a task split, delegate implementation, and perform cross-reviews.",
+        "developerName": "a90604649-cmyk",
+        "category": "Developer Tools",
+        "capabilities": ["Tools"],
+        "defaultPrompt": "Inspect this repository, propose what Codex should handle, then negotiate a concise task split with Gemini before changing code."
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "codex-gemini-team",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local MCP bridge between Codex and Google Antigravity.",
+  "scripts": {
+    "check": "node --check server/index.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "integration": "node scripts/integration.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
