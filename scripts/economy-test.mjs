@@ -21,6 +21,10 @@ try {
   const list = await call('tools/list');
   assert(list.tools.some(t => t.name === 'delegate_to_claude'));
   assert(list.tools.some(t => t.name === 'get_usage'));
+  assert(list.tools.some(t => t.name === 'work_in_roblox'));
+  const invalidRoot = await call('tools/call', {name:'work_in_roblox', arguments:{agent:'claude',workspace:process.cwd(),studio_id:'test',target_root:'Workspace',task:'test'}});
+  assert.equal(invalidRoot.isError, true);
+  assert.match(invalidRoot.content[0].text, /owned subtree/);
   const blocked = await call('tools/call', {name:'negotiate_task_split', arguments:{workspace:process.cwd(), objective:'test', codex_proposal:'test'}});
   assert.equal(blocked.isError, true);
   assert.match(blocked.content[0].text, /negotiation disabled/);

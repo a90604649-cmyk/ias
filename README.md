@@ -12,6 +12,8 @@ No Gemini API key is required. The bridge uses the signed-in Antigravity CLI ses
 
 ## Tools
 
+- `work_in_roblox` (0.3): Gemini or Claude builds directly with the official Roblox MCP registered in Antigravity. Needs an owned subtree and actual confirmed studio ID. Uses per-session permissions from server/studio-access.json. Worker mutations are queued per Studio within a single server process; this is not a cross-process or OS sandbox. Codex must avoid conflicting edits while workers run. Only the coordinator changes Play state. Initial setup on Windows: `agy mcp add Roblox_Studio cmd.exe /c C:\\Users\\you\\AppData\\Local\\Roblox\\mcp.bat` (adjust to actual installed bridge).
+
 - `negotiate_task_split`: Gemini evaluates Codex's proposal and returns an agreed division of work.
 - `delegate_to_gemini`: Gemini analyzes or implements one bounded task.
 - `review_with_gemini`: Gemini reviews a diff or implementation summary without editing.

@@ -5,6 +5,12 @@ description: Coordinate Codex and Gemini as peer coding agents that propose stre
 
 # Codex + Gemini pair workflow
 
+## Direct Roblox teamwork (0.3)
+
+This direct workflow overrides the code-return and Codex-only Studio instructions below whenever direct Studio work is requested.
+
+When the user asks for all three agents, assign separate concrete deliverables to Codex, Gemini and Claude. For Roblox use work_in_roblox instead of requesting code files to paste. Confirm the actual Studio ID, give each task a distinct owned subtree and a concise shared coordinate/interface contract. Workers place a usable first section in Studio early and continue incrementally. The wrapper queues worker mutations per Studio within this server process; Codex must wait before conflicting edits. Other processes and manual edits are NOT protected by this queue. Target paths are instructions, not a hard sandbox. Global Lighting needs allow_global_lighting=true. Only the coordinator changes Play state. Use low models and no discussion loops. This uses Antigravity's registered Roblox_Studio MCP, not free Claude Desktop. Direct access still has context overhead; never promise lower total tokens.
+
 Economy mode overrides the workflow below: every Antigravity invocation loads thousands of context tokens. Small changes use Codex alone. For a substantial task, delegate one independent IMPLEMENTATION to Flash Low. Use Claude Sonnet Low through Antigravity only for another independent deliverable or when explicitly requested. No negotiation, automatic review, or repeated mutual improvement by default. Codex integrates the worker's actual changes and runs focused deterministic tests. Do not regenerate code that a worker already wrote. For Roblox, request a self-contained Luau builder or controller, and let Codex insert it in Studio. Never claim another agent has direct Studio access without verifying it. Prefer supplied context over exploration. High effort and Argon need explicit request or an evidenced cheaper-model failure. Do not silently retry denied calls. Allowed paths are instructions, not an OS sandbox. get_usage reports Antigravity usage in this server session only, excluding Codex. Never promise percentage savings. Opening three apps does not make three agents collaborate; the free Claude Desktop chat cannot be invoked through this bridge.
 
 The following negotiation/review sequence is optional and applies ONLY when the user explicitly requests that extra workflow, not for ordinary economy tasks:

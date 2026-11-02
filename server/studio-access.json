@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp(Roblox_Studio/list_roblox_studios)",
+      "mcp(Roblox_Studio/get_studio_state)",
+      "mcp(Roblox_Studio/execute_luau)",
+      "mcp(Roblox_Studio/screen_capture)",
+      "mcp(Roblox_Studio/get_console_output)",
+      "mcp(Roblox_Studio/script_read)",
+      "mcp(Roblox_Studio/search_game_tree)"
+    ]
+  }
+}

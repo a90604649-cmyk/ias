@@ -3,8 +3,11 @@ import { access } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
+import { fileURLToPath } from "node:url";
 
-const SERVER = { name: "codex-gemini-team", version: "0.2.0" };
+const SERVER = { name: "codex-gemini-team", version: "0.3.0" };
+const STUDIO_SETTINGS = fileURLToPath(new URL("./studio-access.json", import.meta.url));
+const studioQueues = new Map();
 const DEFAULT_MODEL = process.env.GEMINI_TEAM_MODEL || "gemini-3.8-flash-low";
 const FAST_MODEL = process.env.GEMINI_TEAM_FAST_MODEL || "gemini-3.8-flash-low";
 const TIMEOUT_MS = Number(process.env.GEMINI_TEAM_TIMEOUT_MS || 600_000);
@@ -122,6 +125,22 @@ const modelIds = {
   "sonnet-low": "claude-sonnet-5-5-low"
 };
 
+tools.push({
+  name: "work_in_roblox",
+  description: "Gemini or Claude builds directly in a confirmed Roblox Studio, in its owned subtree. Worker mutations are queued per Studio in this process. Paths are instructions, not a hard sandbox.",
+  inputSchema: {
+    type: "object", additionalProperties: false,
+    required: ["agent", "workspace", "studio_id", "target_root", "task"],
+    properties: {
+      agent: {type: "string", enum: ["gemini", "claude"]},
+      workspace: {type: "string"}, studio_id: {type: "string"},
+      target_root: {type: "string", description: "Owned subtree, e.g. Workspace.EchoStation.Props.Claude"},
+      task: {type: "string"}, context: {type: "string"},
+      allow_global_lighting: {type: "boolean", default: false}
+    }
+  }
+});
+
 function textResult(text, isError = false) {
   return { content: [{ type: "text", text: String(text).slice(0, MAX_RESPONSE_CHARS) }], isError };
 }
@@ -145,11 +164,11 @@ async function resolveAgy() {
   return "agy";
 }
 
-async function runAgy({ prompt, workspace, model = DEFAULT_MODEL, allowEdits = false, listModels = false }) {
+async function runAgy({ prompt, workspace, model = DEFAULT_MODEL, allowEdits = false, listModels = false, studio = false }) {
   if (!listModels && prompt.length > MAX_INPUT_CHARS) throw new Error("Context exceeds 16000 characters. Send only the task and relevant files.");
   const cacheKey = JSON.stringify([workspace, model, prompt]);
   // Cache only calls explicitly forbidden to inspect files; repository reviews must stay fresh.
-  const cacheable = !listModels && !allowEdits && prompt.startsWith("NO TOOLS:");
+  const cacheable = !studio && !listModels && !allowEdits && prompt.startsWith("NO TOOLS:");
   if (cacheable && readOnlyCache.has(cacheKey)) return readOnlyCache.get(cacheKey);
   const executable = await resolveAgy();
   const args = listModels
@@ -167,6 +186,7 @@ async function runAgy({ prompt, workspace, model = DEFAULT_MODEL, allowEdits = f
         `${Math.ceil(TIMEOUT_MS / 1000)}s`
       ];
 
+  if (studio) args.push("--settings", STUDIO_SETTINGS);
   return new Promise((resolve, reject) => {
     const child = spawn(executable, args, {
       cwd: workspace || process.cwd(),
@@ -225,6 +245,33 @@ async function callTool(name, input = {}) {
   }
 
   const workspace = path.resolve(requiredString(input.workspace, "workspace"));
+
+  if (name === "work_in_roblox") {
+    if (!["gemini", "claude"].includes(input.agent)) throw new Error("agent must be gemini or claude");
+    const studioId = requiredString(input.studio_id, "studio_id");
+    const target = requiredString(input.target_root, "target_root");
+    if (!/^(Workspace|ServerScriptService|StarterPlayer|StarterGui|ReplicatedStorage)\.[A-Za-z0-9_.]+$/.test(target)) {
+      throw new Error("target_root must name an owned subtree, not an entire service");
+    }
+    const task = requiredString(input.task, "task");
+    const prompt = `Use ONLY the official Roblox_Studio MCP. No terminal or filesystem exploration, no planning discussion.
+Confirmed destination Studio ID: ${studioId}. Verify with list_roblox_studios and get_studio_state. If absent or not Edit, report blocker without changing Play state.
+Owned subtree: ${target}. Create its leaf if needed. Modify only that subtree. Do not delete user objects, clear Workspace, publish, upload assets, or change security settings.
+${input.allow_global_lighting === true ? "Global Lighting changes authorized: preserve originals, name effects, never use Lighting.Technology." : "Do not change global Lighting or other services outside your subtree."}
+TASK: ${task}
+CONTEXT: ${input.context || "Inspect only relevant objects."}
+Put a usable first section into Studio early. Build incremental execute_luau batches and yield heavy loops. Verify actual changes. Return changed paths and checks, not code to paste. Maximum 120 words.`;
+    const previous = studioQueues.get(studioId) || Promise.resolve();
+    const job = previous.catch(() => {}).then(() => runAgy({prompt, workspace,
+      model: input.agent === "claude" ? modelIds["sonnet-low"] : FAST_MODEL,
+      allowEdits: true, studio: true}));
+    studioQueues.set(studioId, job);
+    try {
+      const result = await job;
+      return textResult(result, result.includes("; incomplete: tool permissions denied"));
+    }
+    finally { if (studioQueues.get(studioId) === job) studioQueues.delete(studioId); }
+  }
 
   if (name === "negotiate_task_split") {
     if (process.env.GEMINI_TEAM_ENABLE_NEGOTIATION !== "1") throw new Error("Economy mode: negotiation disabled. Assign a concrete independent task directly. Enable GEMINI_TEAM_ENABLE_NEGOTIATION=1 only if requested.");
