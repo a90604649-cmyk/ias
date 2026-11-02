@@ -4,17 +4,20 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 
-const SERVER = { name: "codex-gemini-team", version: "0.1.0" };
-const DEFAULT_MODEL = process.env.GEMINI_TEAM_MODEL || "gemini-4-argon-low";
+const SERVER = { name: "codex-gemini-team", version: "0.2.0" };
+const DEFAULT_MODEL = process.env.GEMINI_TEAM_MODEL || "gemini-3.8-flash-low";
 const FAST_MODEL = process.env.GEMINI_TEAM_FAST_MODEL || "gemini-3.8-flash-low";
 const TIMEOUT_MS = Number(process.env.GEMINI_TEAM_TIMEOUT_MS || 600_000);
 const MAX_RESPONSE_CHARS = Number(process.env.GEMINI_TEAM_MAX_RESPONSE_CHARS || 24_000);
+const usageLedger = [];
+const readOnlyCache = new Map();
+const MAX_INPUT_CHARS = 16000;
 
 const tools = [
   {
     name: "negotiate_task_split",
     description:
-      "Ask Gemini to evaluate Codex's proposal and agree on a non-overlapping coding task split. Use once per objective after Codex inspects the repository and states its strengths.",
+      "Optional planning discussion. Disabled in economy mode unless the user explicitly requests negotiation. Prefer direct implementation delegation.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -34,7 +37,7 @@ const tools = [
         model: {
           type: "string",
           enum: ["argon-low", "argon-medium", "argon-high", "flash-low"],
-          default: "argon-low"
+          default: "flash-low"
         }
       }
     }
@@ -93,11 +96,30 @@ const tools = [
   }
 ];
 
+tools.push({
+  ...tools.find(tool => tool.name === "delegate_to_gemini"),
+  name: "delegate_to_claude",
+  description: "Implement a separate bounded task using Claude Sonnet Low through the user's Antigravity account, NOT Claude Desktop. Optional; avoid using all agents for the same task.",
+  inputSchema: {
+    ...tools.find(tool => tool.name === "delegate_to_gemini").inputSchema,
+    properties: {
+      ...tools.find(tool => tool.name === "delegate_to_gemini").inputSchema.properties,
+      model: { type: "string", enum: ["sonnet-low"], default: "sonnet-low" }
+    }
+  }
+});
+tools.push({
+  name: "get_usage",
+  description: "Return actual Antigravity token usage for this MCP server session. Does not include Codex usage and cannot establish savings versus a hypothetical solo run.",
+  inputSchema: { type: "object", additionalProperties: false, properties: {} }
+});
+
 const modelIds = {
   "argon-low": "gemini-4-argon-low",
   "argon-medium": "gemini-4-argon-medium",
   "argon-high": "gemini-4-argon-high",
-  "flash-low": FAST_MODEL
+  "flash-low": FAST_MODEL,
+  "sonnet-low": "claude-sonnet-5-5-low"
 };
 
 function textResult(text, isError = false) {
@@ -124,6 +146,11 @@ async function resolveAgy() {
 }
 
 async function runAgy({ prompt, workspace, model = DEFAULT_MODEL, allowEdits = false, listModels = false }) {
+  if (!listModels && prompt.length > MAX_INPUT_CHARS) throw new Error("Context exceeds 16000 characters. Send only the task and relevant files.");
+  const cacheKey = JSON.stringify([workspace, model, prompt]);
+  // Cache only calls explicitly forbidden to inspect files; repository reviews must stay fresh.
+  const cacheable = !listModels && !allowEdits && prompt.startsWith("NO TOOLS:");
+  if (cacheable && readOnlyCache.has(cacheKey)) return readOnlyCache.get(cacheKey);
   const executable = await resolveAgy();
   const args = listModels
     ? ["models"]
@@ -166,7 +193,19 @@ async function runAgy({ prompt, workspace, model = DEFAULT_MODEL, allowEdits = f
       if (listModels) return resolve(stdout.trim());
       try {
         const parsed = JSON.parse(stdout);
-        resolve(parsed.response || parsed.result || stdout.trim());
+        if (parsed.status && parsed.status !== "SUCCESS") {
+          reject(new Error(`Antigravity status: ${parsed.status}`));
+          return;
+        }
+        const response = parsed.response || parsed.result || stdout.trim();
+        const denied = parsed.denied_actions || [];
+        usageLedger.push({ model, usage: parsed.usage || null, denied_actions: denied.length });
+        const result = `${response}\n\n[Usage: ${JSON.stringify(parsed.usage || {})}${denied.length ? "; incomplete: tool permissions denied" : ""}]`;
+        if (cacheable && !denied.length) {
+          if (readOnlyCache.size >= 32) readOnlyCache.delete(readOnlyCache.keys().next().value);
+          readOnlyCache.set(cacheKey, result);
+        }
+        resolve(result);
       } catch {
         resolve(stdout.trim());
       }
@@ -179,6 +218,7 @@ function chosenModel(value) {
 }
 
 async function callTool(name, input = {}) {
+  if (name === "get_usage") return textResult(JSON.stringify({ scope: "Antigravity calls in this server session only; excludes Codex", calls: usageLedger }));
   if (name === "check_antigravity") {
     const models = await runAgy({ listModels: true });
     return textResult(`Antigravity is ready.\n\n${models}`);
@@ -187,6 +227,7 @@ async function callTool(name, input = {}) {
   const workspace = path.resolve(requiredString(input.workspace, "workspace"));
 
   if (name === "negotiate_task_split") {
+    if (process.env.GEMINI_TEAM_ENABLE_NEGOTIATION !== "1") throw new Error("Economy mode: negotiation disabled. Assign a concrete independent task directly. Enable GEMINI_TEAM_ENABLE_NEGOTIATION=1 only if requested.");
     const prompt = `You are Gemini, a peer coding agent working with Codex. Negotiate a practical task split for the repository in ${workspace}.
 
 OBJECTIVE
@@ -205,11 +246,12 @@ Respond concisely with: (1) Gemini strengths for this objective, (2) accepted or
     return textResult(await runAgy({ prompt, workspace, model: chosenModel(input.model), allowEdits: false }));
   }
 
-  if (name === "delegate_to_gemini") {
+  if (name === "delegate_to_gemini" || name === "delegate_to_claude") {
+    const agent = name === "delegate_to_claude" ? "Claude" : "Gemini";
     const allowEdits = input.allow_edits === true;
     const allowed = Array.isArray(input.allowed_paths) ? input.allowed_paths.filter(Boolean) : [];
     if (allowEdits && allowed.length === 0) throw new Error("allowed_paths is required when allow_edits is true");
-    const prompt = `You are Gemini, one member of a Codex + Gemini coding team.
+    const prompt = `${allowEdits ? "IMPLEMENT:" : "NO TOOLS:"} You are ${agent}, a coding teammate. ${allowEdits ? "Inspect only assigned files and implement directly." : "Respond directly from the supplied context. Do not explore files or call tools. Return concrete code when requested."}
 
 TASK
 ${requiredString(input.task, "task")}
@@ -220,9 +262,10 @@ ${input.context || "Inspect only what is needed."}
 ALLOWED PATHS
 ${allowed.length ? allowed.join("\n") : "No file edits; analyze and report only."}
 
-${allowEdits ? "Implement the task. Change only the allowed paths. Run focused checks. Return changed files, checks, and any remaining risk." : "Do not edit files. Return a concise analysis and recommended action."}
-Keep the response compact and do not redo work assigned to Codex.`;
-    return textResult(await runAgy({ prompt, workspace, model: chosenModel(input.model), allowEdits }));
+${allowEdits ? "Implement the task. Change only the allowed paths. Run focused checks. Return file names and a short test summary, not the full code." : "Do not edit files. Deliver only the requested code or answer, no plan or preamble."}
+Do not redo another agent's work. No coordination discussion. Keep summaries under 120 words; code may be longer.`;
+    const model = name === "delegate_to_claude" ? modelIds["sonnet-low"] : chosenModel(input.model);
+    return textResult(await runAgy({ prompt, workspace, model, allowEdits }));
   }
 
   if (name === "review_with_gemini") {

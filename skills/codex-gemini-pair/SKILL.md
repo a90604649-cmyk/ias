@@ -5,7 +5,9 @@ description: Coordinate Codex and Gemini as peer coding agents that propose stre
 
 # Codex + Gemini pair workflow
 
-Keep coordination compact because every Antigravity invocation loads agent context.
+Economy mode overrides the workflow below: every Antigravity invocation loads thousands of context tokens. Small changes use Codex alone. For a substantial task, delegate one independent IMPLEMENTATION to Flash Low. Use Claude Sonnet Low through Antigravity only for another independent deliverable or when explicitly requested. No negotiation, automatic review, or repeated mutual improvement by default. Codex integrates the worker's actual changes and runs focused deterministic tests. Do not regenerate code that a worker already wrote. For Roblox, request a self-contained Luau builder or controller, and let Codex insert it in Studio. Never claim another agent has direct Studio access without verifying it. Prefer supplied context over exploration. High effort and Argon need explicit request or an evidenced cheaper-model failure. Do not silently retry denied calls. Allowed paths are instructions, not an OS sandbox. get_usage reports Antigravity usage in this server session only, excluding Codex. Never promise percentage savings. Opening three apps does not make three agents collaborate; the free Claude Desktop chat cannot be invoked through this bridge.
+
+The following negotiation/review sequence is optional and applies ONLY when the user explicitly requests that extra workflow, not for ordinary economy tasks:
 
 1. Inspect the repository and restate the objective and acceptance criteria.
 2. Write a short Codex proposal naming what Codex should own, what Gemini may own, relevant paths, risks, and review strengths.

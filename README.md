@@ -19,13 +19,15 @@ No Gemini API key is required. The bridge uses the signed-in Antigravity CLI ses
 
 ## Token and quota policy
 
-The default negotiation model is `gemini-4-argon-low`. Routine delegation and review default to `gemini-3.8-flash-low`. Each objective should normally use one negotiation call. Increase model effort only for difficult architecture or debugging.
+Version 0.2 uses economy mode: Flash Low by default, optional Claude Sonnet Low for independent implementation through Antigravity (not the free Desktop chat). Small tasks use Codex alone. Negotiation is disabled by default and reviews are not automatic.
+
+`get_usage` reports actual Antigravity usage in the current server session, excluding Codex. Context-only identical responses can be reused from a bounded memory cache; file reviews and edits are never cached. Input is limited to 16000 characters. Output truncation is a display limit, not a provider token cap. These controls do not guarantee lower total tokens. Allowed paths are instructions, not an OS sandbox.
 
 Optional environment variables:
 
 ```text
 AGY_BIN=C:\Users\you\AppData\Local\agy\bin\agy.exe
-GEMINI_TEAM_MODEL=gemini-4-argon-low
+GEMINI_TEAM_MODEL=gemini-3.8-flash-low
 GEMINI_TEAM_FAST_MODEL=gemini-3.8-flash-low
 GEMINI_TEAM_TIMEOUT_MS=600000
 GEMINI_TEAM_MAX_RESPONSE_CHARS=24000
@@ -48,4 +50,4 @@ Ejecuta `start-ai-team.cmd` para abrir Codex, Claude Desktop y Antigravity CLI. 
 
 ## Suggested prompt
 
-> Inspect this repository. State what Codex is best suited to handle, ask Gemini what it is best suited to handle, negotiate a non-overlapping task split, implement both portions, and cross-review the result.
+> Implement this feature in economy mode: delegate an independent implementation only if worthwhile, integrate changes and run focused tests.
