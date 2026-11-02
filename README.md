@@ -42,6 +42,10 @@ agy models
 
 The plugin manifest is `plugin.json`; `mcp.json` launches `server/index.mjs` over stdio.
 
+## Abrir el equipo
+
+Ejecuta `start-ai-team.cmd` para abrir Codex, Claude Desktop y Antigravity CLI. El acceso directo del Escritorio apunta a ese archivo.
+
 ## Suggested prompt
 
 > Inspect this repository. State what Codex is best suited to handle, ask Gemini what it is best suited to handle, negotiate a non-overlapping task split, implement both portions, and cross-review the result.
